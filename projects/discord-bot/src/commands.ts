@@ -421,8 +421,19 @@ function findPollId(message: Message | PartialMessage): string | undefined {
 }
 
 export async function createBallotFromButton(ctx: Context<ButtonInteraction>) {
-    const user = ctx.interaction.user
-    const message = await ctx.resolveMessage(ctx.interaction.message)
+    const interaction = ctx.interaction
+    const user = interaction.user
+    try {
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply({ ephemeral: true })
+        }
+    } catch (err) {
+        if (!(err instanceof DiscordAPIError && err.code === 40060)) {
+            throw err
+        }
+    }
+
+    const message = await ctx.resolveMessage(interaction.message)
     const pollId = findPollId(message)
     if (!pollId) {
         L.d(`Couldn't find poll for new ballot: ${message.content?.substring(0, POLL_ID_PREFIX.length)}`)
@@ -499,17 +510,22 @@ export async function createBallotFromButton(ctx: Context<ButtonInteraction>) {
             `_Invalid options will be ignored_\n`)
         .addField(poll.topic, `\`\`\`\n${optionText}\n\`\`\``)
         .setFooter(`Privacy notice: Your user id and current user name is linked to your ballot. Your ballot is viewable by you and bot admins.\n\nballot#${ballot.id}`)
-    const dm = await user.send({
-        embeds: [responseEmbed]
+    let dmUrl: string | undefined
+    try {
+        const dm = await user.send({
+            embeds: [responseEmbed]
+        })
+        dmUrl = dm.url
+    } catch (err) {
+        L.e('Failed to send ballot DM', err)
+    }
+
+    const replyEmbed = new MessageEmbed({
+        title: dmUrl ? "Here's your new ballot" : 'Ballot created',
     })
-    await ctx.interaction.reply({
-        embeds: [
-            new MessageEmbed({
-                title: "Here's your new ballot",
-                url: dm.url,
-            })
-        ],
-        ephemeral: true,
+    if (dmUrl) replyEmbed.setURL(dmUrl)
+    await interaction.editReply({
+        embeds: [replyEmbed],
     })
 
     const metrics = await storage.getPollMetrics(poll.id)

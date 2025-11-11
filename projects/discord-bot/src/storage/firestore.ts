@@ -62,11 +62,12 @@ export class FirestoreStorage implements Storage {
         } else {
             closesAt = closesAt.toDate()
         }
+        const rawFeatures = Array.isArray(data.features) ? data.features : []
         const poll = PollDTO.fromJSON({
             ...Poll.toJSON(Poll.fromJSON(data)) as any,
             createdAt: createdAt,
             closesAt: closesAt,
-            features: data.features
+            features: rawFeatures
                 .map((feature: unknown) => {
                     if (typeof(feature) === 'string') {
                         if (feature === 'disableRandomizedBallots') return 'DISABLE_RANDOMIZED_BALLOTS'

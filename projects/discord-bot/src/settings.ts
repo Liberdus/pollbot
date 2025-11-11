@@ -23,4 +23,8 @@ export class L {
         console.log(...args)
     }
   }
+
+  public static e(...args: any): void {
+    console.error(...args)
+  }
 }
